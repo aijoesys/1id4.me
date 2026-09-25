@@ -119,6 +119,41 @@ export const appRouter = router({
       if (!bio) throw new TRPCError({ code: "BAD_GATEWAY", message: "The AI service returned an empty response." });
       return { bio: bio.replace(/^['"`]|['"`]$/g, "").slice(0, 160) };
     }),
+    extractIdScan: publicProcedure.input(z.object({ image: z.string().startsWith("data:image/").max(8_000_000) })).mutation(async ({ input, ctx }) => {
+      if (!ctx.profileId) throw new TRPCError({ code: "UNAUTHORIZED", message: "Log in to extract fields from an ID scan." });
+      const apiKey = process.env.OPENROUTER_API_KEY;
+      if (!apiKey) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "AI is not configured yet. Add OPENROUTER_API_KEY to enable it." });
+      const prompt = `Extract only clearly visible identity and contact details from this ID or business-card scan. Return a single JSON object with these optional string keys: company, project, name, role, issueDate, telephone, whatsapp, email, linkedin, facebook, handle, bio. Use an ISO date (YYYY-MM-DD) when a date is unambiguous. Do not guess, do not include keys you cannot read, do not extract passwords, payment data, or government ID numbers, and return JSON only.`;
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": process.env.PUBLIC_APP_URL || "https://1id4.me",
+          "X-Title": "1id4.me Identity Studio",
+        },
+        body: JSON.stringify({
+          model: "openrouter/free",
+          messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: input.image } }] }],
+          max_tokens: 300,
+          temperature: 0.1,
+        }),
+      });
+      if (!response.ok) {
+        const detail = await response.text().catch(() => "");
+        console.error("[AI] ID scan extraction failed", response.status, detail.slice(0, 300));
+        throw new TRPCError({ code: response.status === 429 ? "TOO_MANY_REQUESTS" : "BAD_GATEWAY", message: "The free AI service could not read this scan. Try a clearer image." });
+      }
+      const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+      const content = data.choices?.[0]?.message?.content?.trim() || "{}";
+      const jsonText = content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
+      let extracted: Record<string, unknown>;
+      try { extracted = JSON.parse(jsonText) as Record<string, unknown>; }
+      catch { throw new TRPCError({ code: "BAD_GATEWAY", message: "The AI returned unreadable scan results. Try a clearer image." }); }
+      const allowed = ["company", "project", "name", "role", "issueDate", "telephone", "whatsapp", "email", "linkedin", "facebook", "handle", "bio"];
+      const fields = Object.fromEntries(allowed.flatMap((key) => typeof extracted[key] === "string" && extracted[key].trim() ? [[key, extracted[key].trim()]] : []));
+      return { fields };
+    }),
   }),
 });
 
