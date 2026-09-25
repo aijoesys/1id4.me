@@ -76,6 +76,50 @@ export const appRouter = router({
       return { handle, profile: input.profile };
     }),
   }),
+  ai: router({
+    polishBio: publicProcedure.input(z.object({
+      name: z.string().max(120).optional(),
+      role: z.string().max(120).optional(),
+      company: z.string().max(160).optional(),
+      project: z.string().max(160).optional(),
+    })).mutation(async ({ input, ctx }) => {
+      if (!ctx.profileId) throw new TRPCError({ code: "UNAUTHORIZED", message: "Log in to use the AI profile assistant." });
+      const apiKey = process.env.OPENROUTER_API_KEY;
+      if (!apiKey) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "AI is not configured yet. Add OPENROUTER_API_KEY to enable it." });
+      const prompt = [
+        "Write one warm, confident link-in-bio introduction for this professional identity.",
+        "Return only the introduction, no quotes, no markdown, and keep it under 160 characters.",
+        `Name: ${input.name || "Not provided"}`,
+        `Role: ${input.role || "Not provided"}`,
+        `Company: ${input.company || "Not provided"}`,
+        `Project: ${input.project || "Not provided"}`,
+      ].join("\n");
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": process.env.PUBLIC_APP_URL || "https://1id4.me",
+          "X-Title": "1id4.me Identity Studio",
+        },
+        body: JSON.stringify({
+          model: "openrouter/free",
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: 80,
+          temperature: 0.7,
+        }),
+      });
+      if (!response.ok) {
+        const detail = await response.text().catch(() => "");
+        console.error("[AI] OpenRouter request failed", response.status, detail.slice(0, 300));
+        throw new TRPCError({ code: response.status === 429 ? "TOO_MANY_REQUESTS" : "BAD_GATEWAY", message: "The free AI service is temporarily unavailable. Try again shortly." });
+      }
+      const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+      const bio = data.choices?.[0]?.message?.content?.trim();
+      if (!bio) throw new TRPCError({ code: "BAD_GATEWAY", message: "The AI service returned an empty response." });
+      return { bio: bio.replace(/^['"`]|['"`]$/g, "").slice(0, 160) };
+    }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

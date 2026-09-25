@@ -96,3 +96,10 @@
 .loading-orb { width:32px; height:32px; border:3px solid #dfe5d4; border-top-color:var(--coral); border-radius:50%; animation:spin .8s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg); } }
 @media (max-width:760px) { .account-topbar,.public-header { padding:0 17px; } .account-back { font-size:0; } .account-back svg { width:18px; height:18px; } .account-main { padding:43px 17px 60px; } .account-grid { grid-template-columns:1fr; margin-top:31px; } .profile-editor { padding:22px 17px 18px; } .account-fields { grid-template-columns:1fr; } .account-save-row { align-items:flex-start; flex-direction:column; } .account-save-row .outline-btn,.account-save-row .coral-btn { width:100%; } .public-header-actions>span { display:none; } .public-edit { font-size:10px; } .public-main { width:min(100% - 34px, 620px); padding-top:57px; } .public-identity h1 { font-size:41px; } .public-footer { width:min(100% - 34px,620px); gap:13px; flex-direction:column; align-items:center; } }
+.ai-bio-row { display:flex; align-items:flex-end; gap:10px; }
+.ai-bio-row .field-wrap { flex:1; }
+.ai-bio-button { height:38px; white-space:nowrap; }
+.ai-bio-note { display:flex; align-items:center; gap:5px; color:#9b9b90; font-size:10px; margin:9px 0 0; }
+.ai-bio-note svg { color:var(--coral); }
+.public-bio { max-width:460px; margin:13px auto 0; color:#72776b; font-size:13px; line-height:1.55; }
+@media (max-width:760px) { .ai-bio-row { align-items:stretch; flex-direction:column; } .ai-bio-button { width:100%; } }
