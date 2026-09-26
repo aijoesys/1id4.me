@@ -70,6 +70,10 @@
 .share-button,.public-edit-main { display:flex; align-items:center; justify-content:center; gap:6px; padding:9px 12px; border-radius:6px; font-size:10px; }
 .share-button { border:1px solid #dfe2d5; color:#778467; background:#f9faf3; }
 .public-edit-main { color:white; background:var(--coral); font-weight:700; box-shadow:0 4px 10px rgba(240,111,82,.16); }
+.share-row { display:flex; align-items:center; justify-content:center; gap:7px; margin-top:15px; }
+.share-row span { margin-right:3px; color:#aaa99e; font:9px 'DM Mono',monospace; letter-spacing:.08em; }
+.share-row button,.share-row a { width:30px; height:30px; display:grid; place-items:center; border:1px solid #dfe1d7; border-radius:50%; color:#8b9183; background:#fafbf4; transition:color .16s ease, border-color .16s ease, transform .16s ease; }
+.share-row button:hover,.share-row a:hover { color:var(--coral); border-color:#efb1a1; transform:translateY(-1px); }
 .public-links { margin-top:51px; }
 .public-section-heading { display:flex; align-items:center; gap:9px; color:#a0a196; font:9px 'DM Mono',monospace; letter-spacing:.13em; }
 .public-section-heading i { flex:1; height:1px; background:#dcddd3; }
