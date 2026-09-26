@@ -37,3 +37,11 @@ export const idProfiles = mysqlTable("idProfiles", {
 
 export type IdProfile = typeof idProfiles.$inferSelect;
 export type InsertIdProfile = typeof idProfiles.$inferInsert;
+
+export const aiUsage = mysqlTable("aiUsage", {
+  profileId: int("profileId").primaryKey(),
+  windowStarted: timestamp("windowStarted").defaultNow().notNull(),
+  requestCount: int("requestCount").default(0).notNull(),
+});
+
+export type AiUsage = typeof aiUsage.$inferSelect;

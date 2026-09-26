@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertIdProfile, InsertUser, idProfiles, users } from "../drizzle/schema";
+import { aiUsage, InsertIdProfile, InsertUser, idProfiles, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -70,4 +70,32 @@ export async function updateProfile(id: number, profile: Pick<InsertIdProfile, "
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
   await db.update(idProfiles).set(profile).where(eq(idProfiles.id, id));
+}
+
+export async function consumeAiRequest(profileId: number, limit = 10) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const current = (await db.select().from(aiUsage).where(eq(aiUsage.profileId, profileId)).limit(1))[0];
+  const now = new Date();
+  const windowExpired = !current || now.getTime() - current.windowStarted.getTime() >= 24 * 60 * 60 * 1000;
+  if (windowExpired) {
+    await db.insert(aiUsage).values({ profileId, windowStarted: now, requestCount: 1 }).onDuplicateKeyUpdate({ set: { windowStarted: now, requestCount: 1 } });
+    return { allowed: true, count: 1, limit, resetAt: new Date(now.getTime() + 24 * 60 * 60 * 1000) };
+  }
+  if (current.requestCount >= limit) {
+    return { allowed: false, count: current.requestCount, limit, resetAt: new Date(current.windowStarted.getTime() + 24 * 60 * 60 * 1000) };
+  }
+  const nextCount = current.requestCount + 1;
+  await db.update(aiUsage).set({ requestCount: nextCount }).where(eq(aiUsage.profileId, profileId));
+  return { allowed: true, count: nextCount, limit, resetAt: new Date(current.windowStarted.getTime() + 24 * 60 * 60 * 1000) };
+}
+
+export async function getAiUsage(profileId: number, limit = 10) {
+  const db = await getDb();
+  if (!db) return { count: 0, limit, resetAt: null };
+  const current = (await db.select().from(aiUsage).where(eq(aiUsage.profileId, profileId)).limit(1))[0];
+  if (!current) return { count: 0, limit, resetAt: null };
+  const resetAt = new Date(current.windowStarted.getTime() + 24 * 60 * 60 * 1000);
+  if (resetAt.getTime() <= Date.now()) return { count: 0, limit, resetAt: null };
+  return { count: current.requestCount, limit, resetAt };
 }

@@ -4,7 +4,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { createProfile, getProfileByHandle, getProfileById, getProfileByIdentifier, updateProfile } from "./db";
+import { consumeAiRequest, createProfile, getAiUsage, getProfileByHandle, getProfileById, getProfileByIdentifier, updateProfile } from "./db";
 import { createProfileSession, getCookieValue, hashPassword, normalizeHandle, normalizeIdentifier, PROFILE_SESSION_COOKIE, verifyPassword } from "./profileAuth";
 
 const profileInput = z.record(z.string(), z.string());
@@ -19,6 +19,14 @@ function safeProfile(row: NonNullable<Awaited<ReturnType<typeof getProfileByHand
   let profile: Record<string, string> = {};
   try { profile = JSON.parse(row.profileJson) as Record<string, string>; } catch { /* invalid legacy data */ }
   return { handle: row.handle, profile };
+}
+
+async function enforceAiQuota(profileId: number) {
+  const quota = await consumeAiRequest(profileId, 10);
+  if (!quota.allowed) {
+    throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "You have reached the 10-request AI limit. Reset after 24 hours." });
+  }
+  return quota;
 }
 
 export const appRouter = router({
@@ -77,6 +85,7 @@ export const appRouter = router({
     }),
   }),
   ai: router({
+    usage: publicProcedure.query(async ({ ctx }) => ctx.profileId ? getAiUsage(ctx.profileId, 10) : null),
     polishBio: publicProcedure.input(z.object({
       name: z.string().max(120).optional(),
       role: z.string().max(120).optional(),
@@ -84,6 +93,7 @@ export const appRouter = router({
       project: z.string().max(160).optional(),
     })).mutation(async ({ input, ctx }) => {
       if (!ctx.profileId) throw new TRPCError({ code: "UNAUTHORIZED", message: "Log in to use the AI profile assistant." });
+      const quota = await enforceAiQuota(ctx.profileId);
       const apiKey = process.env.OPENROUTER_API_KEY;
       if (!apiKey) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "AI is not configured yet. Add OPENROUTER_API_KEY to enable it." });
       const prompt = [
@@ -117,10 +127,11 @@ export const appRouter = router({
       const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
       const bio = data.choices?.[0]?.message?.content?.trim();
       if (!bio) throw new TRPCError({ code: "BAD_GATEWAY", message: "The AI service returned an empty response." });
-      return { bio: bio.replace(/^['"`]|['"`]$/g, "").slice(0, 160) };
+      return { bio: bio.replace(/^['"`]|['"`]$/g, "").slice(0, 160), quota: { count: quota.count, limit: quota.limit, resetAt: quota.resetAt } };
     }),
     extractIdScan: publicProcedure.input(z.object({ image: z.string().startsWith("data:image/").max(8_000_000) })).mutation(async ({ input, ctx }) => {
       if (!ctx.profileId) throw new TRPCError({ code: "UNAUTHORIZED", message: "Log in to extract fields from an ID scan." });
+      const quota = await enforceAiQuota(ctx.profileId);
       const apiKey = process.env.OPENROUTER_API_KEY;
       if (!apiKey) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "AI is not configured yet. Add OPENROUTER_API_KEY to enable it." });
       const prompt = `Extract only clearly visible identity and contact details from this ID or business-card scan. Return a single JSON object with these optional string keys: company, project, name, role, issueDate, telephone, whatsapp, email, linkedin, facebook, handle, bio. Use an ISO date (YYYY-MM-DD) when a date is unambiguous. Do not guess, do not include keys you cannot read, do not extract passwords, payment data, or government ID numbers, and return JSON only.`;
@@ -152,7 +163,7 @@ export const appRouter = router({
       catch { throw new TRPCError({ code: "BAD_GATEWAY", message: "The AI returned unreadable scan results. Try a clearer image." }); }
       const allowed = ["company", "project", "name", "role", "issueDate", "telephone", "whatsapp", "email", "linkedin", "facebook", "handle", "bio"];
       const fields = Object.fromEntries(allowed.flatMap((key) => typeof extracted[key] === "string" && extracted[key].trim() ? [[key, extracted[key].trim()]] : []));
-      return { fields };
+      return { fields, quota: { count: quota.count, limit: quota.limit, resetAt: quota.resetAt } };
     }),
   }),
 });
