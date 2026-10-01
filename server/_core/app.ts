@@ -5,7 +5,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
-import { serveStatic, setupVite } from "./vite";
+import { serveStatic } from "./static";
 
 export async function createApp(options: { development?: boolean; server?: Server } = {}): Promise<Express> {
   const app = express();
@@ -18,6 +18,7 @@ export async function createApp(options: { development?: boolean; server?: Serve
 
   if (options.development) {
     if (!options.server) throw new Error("A development HTTP server is required for Vite middleware.");
+    const { setupVite } = await import("./vite");
     await setupVite(app, options.server);
   } else {
     serveStatic(app);
