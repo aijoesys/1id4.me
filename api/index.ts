@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import type { Request, Response } from "express";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { appRouter } from "../server/routers";
 import { createContext } from "../server/_core/context";
@@ -15,4 +16,6 @@ registerStorageProxy(app);
 registerOAuthRoutes(app);
 app.use("/api/trpc", createExpressMiddleware({ router: appRouter, createContext }));
 
-export default app;
+export default function handler(req: Request, res: Response) {
+  return app(req, res);
+}
