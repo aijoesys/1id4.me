@@ -1,11 +1,10 @@
 import "dotenv/config";
 import express from "express";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { appRouter } from "./server/routers";
-import { createContext } from "./server/_core/context";
-import { registerOAuthRoutes } from "./server/_core/oauth";
-import { registerStorageProxy } from "./server/_core/storageProxy";
-import { serveStatic } from "./server/_core/static";
+import { appRouter } from "../server/routers";
+import { createContext } from "../server/_core/context";
+import { registerOAuthRoutes } from "../server/_core/oauth";
+import { registerStorageProxy } from "../server/_core/storageProxy";
 
 const app = express();
 
@@ -15,6 +14,5 @@ app.get("/api/health", (_req, res) => res.status(200).json({ ok: true, service: 
 registerStorageProxy(app);
 registerOAuthRoutes(app);
 app.use("/api/trpc", createExpressMiddleware({ router: appRouter, createContext }));
-serveStatic(app);
 
 export default app;
