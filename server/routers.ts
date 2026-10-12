@@ -7,7 +7,47 @@ import { publicProcedure, router } from "./_core/trpc";
 import { consumeAiRequest, createProfile, getAiUsage, getProfileByHandle, getProfileById, getProfileByIdentifier, updateProfile } from "./db";
 import { createProfileSession, getCookieValue, hashPassword, normalizeHandle, normalizeIdentifier, PROFILE_SESSION_COOKIE, verifyPassword } from "./profileAuth";
 
-const profileInput = z.record(z.string(), z.string());
+const profileInput = z.object({
+  company: z.string().trim().max(160).optional(),
+  project: z.string().trim().max(160).optional(),
+  name: z.string().trim().max(160).optional(),
+  role: z.string().trim().max(160).optional(),
+  issueDate: z.string().trim().max(32).optional(),
+  telephone: z.string().trim().max(48).optional(),
+  whatsapp: z.string().trim().max(48).optional(),
+  email: z.string().trim().email().max(320).optional().or(z.literal("")),
+  linkedin: z.string().trim().max(320).optional(),
+  facebook: z.string().trim().max(320).optional(),
+  handle: z.string().trim().max(64).regex(/^[a-zA-Z0-9._-]*$/).optional(),
+  bio: z.string().trim().max(500).optional(),
+  photo: z.string().max(2_000_000).optional(),
+  paymentQr: z.string().max(2_000_000).optional(),
+}).strict();
+type Profile = z.infer<typeof profileInput>;
+
+const publicProfileKeys = [
+  "company", "project", "name", "role", "issueDate", "telephone", "whatsapp",
+  "email", "linkedin", "facebook", "handle", "bio", "photo",
+] as const satisfies readonly (keyof Profile)[];
+
+function parseStoredProfile(profileJson: string): Profile {
+  try {
+    const parsed: unknown = JSON.parse(profileJson);
+    const result = profileInput.safeParse(parsed);
+    return result.success ? result.data : {};
+  } catch {
+    return {};
+  }
+}
+
+function publicProfile(profile: Profile): Partial<Profile> {
+  return Object.fromEntries(
+    publicProfileKeys.flatMap((key) => {
+      const value = profile[key];
+      return typeof value === "string" && value.length > 0 ? [[key, value]] : [];
+    }),
+  );
+}
 const profileShape = z.object({
   handle: z.string().trim().min(3).max(64).regex(/^[a-zA-Z0-9._-]+$/),
   identifier: z.string().trim().min(5).max(320),
@@ -15,10 +55,9 @@ const profileShape = z.object({
   profile: profileInput,
 });
 
-function safeProfile(row: NonNullable<Awaited<ReturnType<typeof getProfileByHandle>>>) {
-  let profile: Record<string, string> = {};
-  try { profile = JSON.parse(row.profileJson) as Record<string, string>; } catch { /* invalid legacy data */ }
-  return { handle: row.handle, profile };
+function safeProfile(row: NonNullable<Awaited<ReturnType<typeof getProfileByHandle>>>, isPublic = false) {
+  const profile = parseStoredProfile(row.profileJson);
+  return { handle: row.handle, profile: isPublic ? publicProfile(profile) : profile };
 }
 
 async function enforceAiQuota(profileId: number) {
@@ -43,7 +82,7 @@ export const appRouter = router({
     publicByHandle: publicProcedure.input(z.object({ handle: z.string().min(3).max(64) })).query(async ({ input }) => {
       const row = await getProfileByHandle(normalizeHandle(input.handle));
       if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "This 1id4.me profile does not exist." });
-      return safeProfile(row);
+      return safeProfile(row, true);
     }),
     session: publicProcedure.query(async ({ ctx }) => {
       if (!ctx.profileId) return null;
@@ -58,9 +97,10 @@ export const appRouter = router({
       }
       if (await getProfileByHandle(handle)) throw new TRPCError({ code: "CONFLICT", message: "That handle is already taken." });
       if (await getProfileByIdentifier(identifier)) throw new TRPCError({ code: "CONFLICT", message: "That email or telephone number is already registered." });
-      const id = await createProfile({ handle, identifier, passwordHash: hashPassword(input.password), profileJson: JSON.stringify(input.profile) });
+      const profile = profileInput.parse(input.profile);
+      const id = await createProfile({ handle, identifier, passwordHash: hashPassword(input.password), profileJson: JSON.stringify(profile) });
       ctx.res.cookie(PROFILE_SESSION_COOKIE, createProfileSession(id), { ...getSessionCookieOptions(ctx.req), maxAge: 1000 * 60 * 60 * 24 * 30 });
-      return { handle, profile: input.profile };
+      return { handle, profile };
     }),
     login: publicProcedure.input(z.object({ identifier: z.string().min(5), password: z.string().min(8) })).mutation(async ({ input, ctx }) => {
       const row = await getProfileByIdentifier(normalizeIdentifier(input.identifier));
@@ -80,8 +120,9 @@ export const appRouter = router({
       if (existingHandle && existingHandle.id !== ctx.profileId) throw new TRPCError({ code: "CONFLICT", message: "That handle is already taken." });
       const existingIdentifier = await getProfileByIdentifier(identifier);
       if (existingIdentifier && existingIdentifier.id !== ctx.profileId) throw new TRPCError({ code: "CONFLICT", message: "That email or telephone number is already registered." });
-      await updateProfile(ctx.profileId, { handle, identifier, profileJson: JSON.stringify(input.profile) });
-      return { handle, profile: input.profile };
+      const profile = profileInput.parse(input.profile);
+      await updateProfile(ctx.profileId, { handle, identifier, profileJson: JSON.stringify(profile) });
+      return { handle, profile };
     }),
   }),
   ai: router({
