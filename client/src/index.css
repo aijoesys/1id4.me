@@ -17,3 +17,41 @@
   .print-sheet .print-card.is-back .payment-qr-wrap img{width:92px;height:92px}
   .print-sheet .print-card.is-back .thank-you{margin-top:17px}
 }
+
+/* Export controls and A4 proofing preview */
+.export-actions{display:flex;flex-wrap:wrap;gap:8px;padding:14px 0 0}
+.export-actions button{font-size:12px;padding:9px 12px}
+.print-preview-backdrop{z-index:50;overflow:auto;padding:24px}
+.print-preview-modal{width:min(1120px,96vw);max-height:calc(100vh - 48px);overflow:auto;background:#f8f7f0;border:1px solid #dfe7d2;border-radius:22px;padding:24px;box-shadow:0 24px 80px #16211833}
+.modal-subcopy{margin:5px 0 0;color:#777e6b;font-size:13px}
+.a4-preview-page{position:relative;width:min(100%,980px);aspect-ratio:297 / 210;margin:20px auto 0;background:#fffef8;border:1px solid #e2e6dc;padding:5.5% 5.5%;box-shadow:0 14px 35px #16211814}
+.a4-preview-header{display:flex;justify-content:space-between;color:#777e6b;font-size:9px;letter-spacing:.12em;font-weight:700}
+.a4-card-row{display:flex;justify-content:center;align-items:flex-start;gap:7%;margin-top:12%;}
+.a4-card-group{display:flex;flex-direction:column;align-items:center;min-width:0}
+.a4-guide{padding:12px;position:relative}
+.trim-guide{position:relative;padding:5px;border:1px dashed #f06f52}
+.safe-guide{position:relative;padding:4px;border:1px dashed #81945f}
+.a4-guide .id-card{width:260px!important;height:164px!important;min-width:260px!important;min-height:164px!important;margin:0!important;border-radius:10px!important;box-shadow:0 8px 20px #16211818!important}
+.a4-card-group>strong{font-size:13px;color:#34382f;margin-top:6px}
+.a4-card-group>small{font-size:9px;color:#777e6b;text-align:center;margin-top:3px;max-width:290px;line-height:1.35}
+.guide-legend{position:absolute;left:5.5%;right:5.5%;bottom:6%;display:flex;gap:18px;align-items:center;color:#777e6b;font-size:10px}
+.guide-legend span{display:flex;align-items:center;gap:5px}.guide-legend span:last-child{margin-left:auto}
+.legend-trim,.legend-safe{width:18px;height:8px;display:inline-block}.legend-trim{border-top:1px dashed #f06f52}.legend-safe{border-top:1px dashed #81945f}
+.print-preview-actions{justify-content:flex-end;align-items:center}.print-preview-actions .helper-copy{margin-right:auto}
+.print-sheet{position:absolute;left:-10000px;top:0;display:flex;width:171.2mm;height:54mm;gap:0}
+.print-sheet>div{flex:0 0 85.6mm;width:85.6mm;height:54mm}
+.print-sheet .print-card{width:85.6mm;height:54mm;min-width:85.6mm;min-height:54mm;border-radius:0;box-shadow:none}
+@media print{
+  @page{size:A4 landscape;margin:0}
+  body>*{display:none!important}
+  .print-preview-backdrop{display:block!important;position:static!important;padding:0!important;background:#fff!important}
+  .print-preview-modal{display:block!important;width:297mm!important;height:210mm!important;max-height:none!important;overflow:hidden!important;border:0!important;border-radius:0!important;box-shadow:none!important;padding:15mm!important;background:#fffef8!important}
+  .print-preview-modal>.modal-heading,.print-preview-actions{display:none!important}
+  .a4-preview-page{display:block!important;width:267mm!important;height:180mm!important;aspect-ratio:auto!important;margin:0!important;padding:12mm!important;box-shadow:none!important;border:0!important}
+  .a4-card-row{margin-top:40mm;gap:28mm}
+  .a4-guide{padding:3mm}.trim-guide{padding:1.5mm}.safe-guide{padding:1.2mm}
+  .a4-guide .id-card{width:85.6mm!important;height:54mm!important;min-width:85.6mm!important;min-height:54mm!important;border-radius:0!important;box-shadow:none!important}
+  .a4-card-group>strong{font-size:11pt;margin-top:3mm}.a4-card-group>small{font-size:8pt;max-width:90mm}
+  .guide-legend{left:12mm;right:12mm;bottom:8mm;font-size:8pt}
+  .print-sheet{display:none!important}
+}
