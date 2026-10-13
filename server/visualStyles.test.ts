@@ -24,4 +24,13 @@ describe("landing page visual stylesheet", () => {
     expect(css).toContain("--coral: #146ec1");
     expect(css).toContain("--olive: #23845d");
   });
+
+  it("keeps a responsive starter-template gallery", () => {
+    const css = readFileSync(resolve(process.cwd(), "client/src/index.css"), "utf8");
+
+    expect(css).toContain(".template-gallery");
+    expect(css).toContain(".template-gallery-card");
+    expect(css).toContain(".gallery-mini-card");
+    expect(css).toContain("grid-template-columns:repeat(2, minmax(0, 1fr))");
+  });
 });
